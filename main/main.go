@@ -11,6 +11,8 @@ import (
 )
 
 var region string = "us-west-2"
+var vpcKeyword string = "gate-stg-cs-ci" // all gating jobs prepared vpc are started from gate-<env>-cs-ci
+var timeDu time.Duration = 6             // the vpc created before Now - timeDu hours will be deleted
 
 func CleanUpVPC() {
 	client, err := aws_client.CreateAWSClient("", region)
@@ -22,12 +24,12 @@ func CleanUpVPC() {
 		panic(err.Error())
 	}
 	vpcCleanup := []string{}
-	throttleTime := time.Now().Add(-6 * time.Hour)
+	throttleTime := time.Now()
 	for _, vpcExist := range vpcs {
 		nameMatch := false
 		timeMatch := false
 		for _, tag := range vpcExist.Tags {
-			if *tag.Key == "Name" && (strings.Contains(*tag.Value, "gate-stg-cs-ci")) { // all gating jobs prepared vpc are started from gate-<env>-cs-ci
+			if *tag.Key == "Name" && (strings.Contains(*tag.Value, vpcKeyword)) {
 				nameMatch = true
 			}
 			if *tag.Key == "openshift_creationDate" {
@@ -35,7 +37,7 @@ func CleanUpVPC() {
 				if err != nil {
 					panic(err.Error())
 				}
-				if creationTime.Before(throttleTime) {
+				if creationTime.Add(timeDu * time.Hour).Before(throttleTime) {
 					timeMatch = true
 				}
 			}
